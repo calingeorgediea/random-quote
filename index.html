@@ -4,69 +4,177 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Random Quote</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/3.1.9-1/crypto-js.js"></script>
   <style>
     body {
-      font-family: Arial, sans-serif;
+      font-family: 'Poppins', sans-serif;
       display: flex;
       justify-content: center;
       align-items: center;
       height: 100vh;
       margin: 0;
-      background-color: #f0f0f0;
+      background: linear-gradient(135deg, #ff9a9e, #fad0c4);
     }
     .quote-container {
       text-align: center;
-      background-color: white;
-      border-radius: 10px;
-      padding: 30px;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-      max-width: 500px;
-      width: 100%;
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 15px;
+      padding: 40px 30px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+      max-width: 600px;
+      width: 90%;
+      animation: fadeIn 1s ease-in-out;
     }
     .quote {
-      font-size: 1.5rem;
+      font-size: 2rem;
       font-style: italic;
-      margin-bottom: 10px;
+      line-height: 1.6;
+      color: #555;
+      margin-bottom: 20px;
     }
     .author {
       font-size: 1.2rem;
-      color: #555;
+      font-weight: bold;
+      color: #333;
+    }
+    .quote:before {
+      content: '“';
+      font-size: 3rem;
+      color: #ff6f61;
+      vertical-align: -0.4em;
+    }
+    .quote:after {
+      content: '”';
+      font-size: 3rem;
+      color: #ff6f61;
+      vertical-align: -0.4em;
+    }
+    .button-container {
+      margin-top: 20px;
+    }
+    button {
+      background-color: #ff6f61;
+      color: white;
+      padding: 10px 20px;
+      font-size: 1rem;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    button:hover {
+      background-color: #ff4a39;
+    }
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
   </style>
 </head>
 <body>
 
   <div class="quote-container">
-    <div class="quote" id="quote"></div>
+    <div class="quote" id="quote">Click "Fetch New Quote" to get a quote!</div>
     <div class="author" id="author"></div>
+    <div class="button-container">
+      <button id="fetchButton">Fetch New Quotes</button>
+      <button id="nextQuoteButton" style="display: none;">Next Quote</button>
+    </div>
   </div>
 
   <script>
-    // Fetch quotes from JSONBin
-    fetch('https://api.jsonbin.io/v3/b/67928d62ad19ca34f8f3558c', {
-      headers: {
-        'X-Master-Key': '$2a$10$BU2YySvF3iyknRbMBa3cvuG1z4jGRhirbl20W6deBKSmGGAXKAWx.'
-      }
-    })
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return response.json();
-      })
-      .then(data => {
-        const quotes = data.record; // Ensure this matches the structure of your JSON
-        const randomIndex = Math.floor(Math.random() * quotes.length);
-        const randomQuote = quotes[randomIndex];
+    let cachedQuotes = [];
+    let currentQuoteIndex = -1;
 
-        document.getElementById('quote').innerText = `"${randomQuote.quote}"`;
-        document.getElementById('author').innerText = `- ${randomQuote.author}`;
-      })
-      .catch(error => {
-        console.error('Error fetching quotes:', error);
-        document.getElementById('quote').innerText = 'Error loading quote.';
-        document.getElementById('author').innerText = '';
+    // Extract the API key from the query parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const apiKey = urlParams.get('key');
+
+    if (!apiKey) {
+      document.getElementById('quote').innerText = 'API key is missing in the URL.';
+      document.getElementById('author').innerText = '';
+      console.error('API key is required in the query string as ?key=YOUR_API_KEY');
+    } else {
+      // Fetch quotes from JSONBin with the API key when the user presses "Fetch New Quotes"
+      document.getElementById('fetchButton').addEventListener('click', () => {
+        fetchQuotes(apiKey);
       });
+
+      // Show the next cached quote when the user presses "Next Quote"
+      document.getElementById('nextQuoteButton').addEventListener('click', () => {
+        showNextQuote();
+      });
+    }
+
+    function fetchQuotes(apiKey) {
+      // Fetch quotes from the API and cache them (encrypted)
+      fetch(`https://api.jsonbin.io/v3/b/67928d62ad19ca34f8f3558c?meta=false`, {
+        headers: {
+          'X-Master-Key': apiKey
+        }
+      })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          return response.json();
+        })
+        .then(data => {
+          const encryptedData = encryptData(JSON.stringify(data)); // Encrypt the quotes
+          localStorage.setItem('quotes', encryptedData); // Save encrypted quotes in localStorage
+          cachedQuotes = data; // Cache the decrypted quotes in memory
+          currentQuoteIndex = -1; // Reset index to show new random quote next time
+          document.getElementById('nextQuoteButton').style.display = 'inline-block';
+          showNextQuote(); // Show the first random quote immediately
+        })
+        .catch(error => {
+          console.error('Error fetching quotes:', error);
+          document.getElementById('quote').innerText = 'Error loading quote.';
+          document.getElementById('author').innerText = '';
+        });
+    }
+
+    function showNextQuote() {
+      if (cachedQuotes.length > 0) {
+        // Generate the next index in the cached quotes list
+        currentQuoteIndex = (currentQuoteIndex + 1) % cachedQuotes.length;
+        const nextQuote = cachedQuotes[currentQuoteIndex];
+
+        document.getElementById('quote').innerText = nextQuote.quote;
+        document.getElementById('author').innerText = `- ${nextQuote.author}`;
+      }
+    }
+
+    function encryptData(data) {
+      const encryptedData = CryptoJS.AES.encrypt(data, apiKey).toString(); // Encrypt the data
+      return encryptedData;
+    }
+
+    function decryptData(encryptedData) {
+      const decryptedBytes = CryptoJS.AES.decrypt(encryptedData, apiKey); // Decrypt the data
+      const decryptedData = decryptedBytes.toString(CryptoJS.enc.Utf8); // Convert bytes to string
+      return JSON.parse(decryptedData);
+    }
+
+    // On page load, try to retrieve and decrypt the quotes from localStorage
+    window.onload = function() {
+      const encryptedQuotes = localStorage.getItem('quotes');
+      if (encryptedQuotes) {
+        try {
+          cachedQuotes = decryptData(encryptedQuotes); // Decrypt and load quotes
+          document.getElementById('nextQuoteButton').style.display = 'inline-block';
+          showNextQuote(); // Show the first cached quote immediately
+        } catch (error) {
+          console.error('Error decrypting quotes:', error);
+        }
+      }
+    };
   </script>
 
 </body>
