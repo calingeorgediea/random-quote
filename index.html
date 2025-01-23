@@ -42,17 +42,31 @@
   </div>
 
   <script>
-    fetch('https://api.jsonbin.io/v3/b/67928d62ad19ca34f8f3558c')
-      .then(response => response.json())
+    // Fetch quotes from JSONBin
+    fetch('https://api.jsonbin.io/v3/b/67928d62ad19ca34f8f3558c', {
+      headers: {
+        'X-Master-Key': '$2a$10$BU2YySvF3iyknRbMBa3cvuG1z4jGRhirbl20W6deBKSmGGAXKAWx.'
+      }
+    })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+      })
       .then(data => {
-        const quotes = data.record; // Adjust if the structure is different
+        const quotes = data.record; // Ensure this matches the structure of your JSON
         const randomIndex = Math.floor(Math.random() * quotes.length);
         const randomQuote = quotes[randomIndex];
 
         document.getElementById('quote').innerText = `"${randomQuote.quote}"`;
         document.getElementById('author').innerText = `- ${randomQuote.author}`;
       })
-      .catch(error => console.error('Error fetching quotes:', error));
+      .catch(error => {
+        console.error('Error fetching quotes:', error);
+        document.getElementById('quote').innerText = 'Error loading quote.';
+        document.getElementById('author').innerText = '';
+      });
   </script>
 
 </body>
